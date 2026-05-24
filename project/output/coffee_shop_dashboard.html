@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Coffee Shop Sales Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1208;
+      color: #d4b896;
+      min-height: 100vh;
+    }
+
+    .header {
+      padding: 24px 28px 16px;
+      border-bottom: 1px solid #2e2416;
+    }
+    .header h1 {
+      font-size: 26px;
+      color: #f0dfc0;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .header h1 span { color: #c9912a; }
+    .header p {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #7a6040;
+    }
+
+    /* tabs */
+    .tabs {
+      display: flex;
+      background: #150f07;
+      border-bottom: 1px solid #2e2416;
+      padding: 0 28px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 12px 16px;
+      font-size: 11px;
+      cursor: pointer;
+      color: #7a6040;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: color 0.15s;
+    }
+    .tab:hover { color: #d4b896; }
+    .tab.active { color: #e8b84a; border-bottom-color: #c9912a; }
+
+    .content { padding: 24px 28px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* kpi strip */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi {
+      background: #231a0d;
+      border: 1px solid #2e2416;
+      border-radius: 4px;
+      padding: 16px 18px;
+      border-top: 2px solid #c9912a;
+    }
+    .kpi-label { font-size: 10px; color: #7a6040; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .kpi-value { font-size: 26px; font-weight: 700; color: #f0dfc0; }
+    .kpi-sub { font-size: 10px; color: #7a6040; margin-top: 4px; }
+
+    /* cards */
+    .row2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .row-half { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+    .card {
+      background: #231a0d;
+      border: 1px solid #2e2416;
+      border-radius: 4px;
+      padding: 18px 20px;
+    }
+    .card h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #c9912a;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #2e2416;
+    }
+
+    canvas { max-height: 230px; }
+    .tall canvas { max-height: 280px; }
+
+    /* tables */
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    thead th {
+      background: #3d2b1a;
+      color: #e8b84a;
+      padding: 7px 10px;
+      text-align: left;
+      font-weight: 500;
+      font-size: 10px;
+    }
+    thead th:not(:first-child) { text-align: right; }
+    tbody td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #2e2416;
+      color: #d4b896;
+    }
+    tbody td:not(:first-child) { text-align: right; color: #f0dfc0; }
+    tbody tr:hover td { background: rgba(201,145,42,.06); }
+    tbody tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+    .total-row td { background: #3d2b1a !important; color: #e8b84a !important; font-weight: 600; }
+    .peak-row td { background: rgba(201,145,42,.1) !important; }
+
+    /* store bars under donut */
+    .store-bars { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .sbar-label { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; }
+    .sbar-label span:last-child { color: #e8b84a; }
+    .sbar-track { height: 5px; background: #2e2416; border-radius: 3px; overflow: hidden; }
+    .sbar-fill { height: 100%; background: linear-gradient(90deg, #c9912a, #e8b84a); border-radius: 3px; }
+
+    /* heatmap */
+    .hm-wrap { overflow-x: auto; }
+    .hm-grid { display: grid; gap: 3px; min-width: 500px; }
+    .hm-lbl { font-size: 9px; color: #7a6040; display: flex; align-items: center; padding-right: 4px; }
+    .hm-cell {
+      height: 22px;
+      border-radius: 2px;
+      position: relative;
+      cursor: default;
+    }
+    .hm-cell:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 3px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #3d2b1a;
+      border: 1px solid #c9912a;
+      padding: 3px 7px;
+      border-radius: 2px;
+      font-size: 9px;
+      color: #f0dfc0;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    .up { color: #6aab6a; }
+    .dn { color: #ab5a4a; }
+
+    .note {
+      font-size: 10px;
+      color: #7a6040;
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-left: 2px solid #c9912a;
+      background: #1e1409;
+    }
+
+    .rank-n {
+      display: inline-block;
+      width: 18px; height: 18px;
+      background: #3d2b1a;
+      border-radius: 2px;
+      text-align: center; line-height: 18px;
+      font-size: 9px; color: #7a6040;
+      margin-right: 5px;
+    }
+    .rank-n.gold { background: #c9912a; color: #fff; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Coffee Shop <span>Sales</span> Dashboard</h1>
+  <p>New York City &nbsp;·&nbsp; 3 Locations &nbsp;·&nbsp; Jan – Jun 2023 &nbsp;·&nbsp; 149,116 transactions</p>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('dashboard', this)">📊 Dashboard</div>
+  <div class="tab" onclick="switchTab('products', this)">🛒 Product Analysis</div>
+  <div class="tab" onclick="switchTab('time', this)">⏰ Time Analysis</div>
+  <div class="tab" onclick="switchTab('stores', this)">🏪 Store Deep Dive</div>
+  <div class="tab" onclick="switchTab('raw', this)">📋 Raw Data</div>
+</div>
+
+<div class="content">
+
+  <!-- DASHBOARD -->
+  <div class="panel active" id="tab-dashboard">
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value">$698.8K</div>
+        <div class="kpi-sub">All 3 stores · H1 2023</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Transactions</div>
+        <div class="kpi-value">149,116</div>
+        <div class="kpi-sub">Total orders placed</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value">$4.69</div>
+        <div class="kpi-sub">Per transaction</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Best Month</div>
+        <div class="kpi-value">June</div>
+        <div class="kpi-sub">$166,486 &nbsp;<span class="up">↑6.2%</span></div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="card">
+        <h3>Monthly Revenue</h3>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+      <div class="card">
+        <h3>Store Split</h3>
+        <canvas id="storePie"></canvas>
+        <div class="store-bars" id="storeBars"></div>
+      </div>
+    </div>
+
+    <div class="row3">
+      <div class="card">
+        <h3>Revenue by Category</h3>
+        <canvas id="catDoughnut"></canvas>
+      </div>
+      <div class="card">
+        <h3>Monthly Summary</h3>
+        <table id="monthlyTbl"></table>
+      </div>
+      <div class="card">
+        <h3>Weekday Revenue</h3>
+        <canvas id="weekdayMini"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCTS -->
+  <div class="panel" id="tab-products">
+    <div class="row2">
+      <div class="card tall">
+        <h3>Revenue by Category</h3>
+        <canvas id="catBar"></canvas>
+      </div>
+      <div class="card">
+        <h3>Category Table</h3>
+        <table id="catTbl"></table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Top 20 Products</h3>
+      <table id="prodTbl"></table>
+    </div>
+  </div>
+
+  <!-- TIME -->
+  <div class="panel" id="tab-time">
+    <div class="row2">
+      <div class="card">
+        <h3>Hourly Revenue</h3>
+        <canvas id="hourlyChart"></canvas>
+        <div class="note">8–10 AM accounts for ~36% of daily revenue</div>
+      </div>
+      <div class="card">
+        <h3>Hourly Table</h3>
+        <table id="hourlyTbl"></table>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="card">
+        <h3>Weekday Revenue</h3>
+        <canvas id="weekdayBar"></canvas>
+      </div>
+      <div class="card">
+        <h3>Weekday Table</h3>
+        <table id="weekdayTbl"></table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Heatmap — Hour × Weekday</h3>
+      <div class="hm-wrap"><div class="hm-grid" id="heatmap"></div></div>
+    </div>
+  </div>
+
+  <!-- STORES -->
+  <div class="panel" id="tab-stores">
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">Hell's Kitchen</div>
+        <div class="kpi-value">$236.5K</div>
+        <div class="kpi-sub">50,735 txns · $4.66 avg</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Astoria</div>
+        <div class="kpi-value">$232.2K</div>
+        <div class="kpi-sub">50,599 txns · $4.59 avg</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Lower Manhattan</div>
+        <div class="kpi-value">$230.1K</div>
+        <div class="kpi-sub">47,782 txns · $4.81 avg</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Spread</div>
+        <div class="kpi-value">2.8%</div>
+        <div class="kpi-sub">Between top and bottom store</div>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="card tall">
+        <h3>Monthly Revenue by Store</h3>
+        <canvas id="storeGrouped"></canvas>
+      </div>
+      <div class="card">
+        <h3>Monthly × Store (MoM)</h3>
+        <table id="storeMthTbl"></table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Revenue Trend Indexed (Jan = 100)</h3>
+      <canvas id="storeIndex"></canvas>
+    </div>
+  </div>
+
+  <!-- RAW -->
+  <div class="panel" id="tab-raw">
+    <div class="card">
+      <h3>Sample Transactions (50 rows)</h3>
+      <p style="font-size:10px;color:#7a6040;margin-bottom:12px;">Showing 50 of 149,116 rows. Full dataset in Coffee_Shop_Sales.xlsx</p>
+      <div style="overflow-x:auto"><table id="rawTbl"></table></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// data
+const D = {
+  monthly: [
+    {m:"Jan",txns:17314,rev:81677.74,avg:4.72,mom:null},
+    {m:"Feb",txns:16359,rev:76145.19,avg:4.65,mom:-6.8},
+    {m:"Mar",txns:21229,rev:98834.68,avg:4.66,mom:29.8},
+    {m:"Apr",txns:25335,rev:118941.08,avg:4.69,mom:20.3},
+    {m:"May",txns:33527,rev:156727.76,avg:4.67,mom:31.8},
+    {m:"Jun",txns:35352,rev:166485.88,avg:4.71,mom:6.2},
+  ],
+  stores: [
+    {name:"Hell's Kitchen",txns:50735,rev:236511.17,avg:4.66},
+    {name:"Astoria",       txns:50599,rev:232243.91,avg:4.59},
+    {name:"Lower Manhattan",txns:47782,rev:230057.25,avg:4.81},
+  ],
+  categories: [
+    {name:"Coffee",             txns:58416,rev:269952.45},
+    {name:"Tea",                txns:45449,rev:196405.95},
+    {name:"Bakery",             txns:22796,rev:82315.64},
+    {name:"Drinking Chocolate", txns:11468,rev:72416.00},
+    {name:"Coffee Beans",       txns:1753, rev:40085.25},
+    {name:"Branded",            txns:747,  rev:13607.00},
+    {name:"Loose Tea",          txns:1210, rev:11213.60},
+    {name:"Flavours",           txns:6790, rev:8408.80},
+    {name:"Packaged Chocolate", txns:487,  rev:4407.64},
+  ],
+  products: [
+    {r:1, name:"Sustainably Grown Organic Lg", txns:2961, rev:21151.75, price:7.14},
+    {r:2, name:"Dark Chocolate Lg",            txns:3029, rev:21006.00, price:6.94},
+    {r:3, name:"Latte Rg",                     txns:2896, rev:19112.25, price:6.60},
+    {r:4, name:"Cappuccino Lg",                txns:2772, rev:17641.75, price:6.37},
+    {r:5, name:"Morning Sunrise Chai Lg",      txns:2830, rev:17384.00, price:6.14},
+    {r:6, name:"Latte",                        txns:2990, rev:17257.50, price:5.77},
+    {r:7, name:"Jamaican Coffee River Lg",     txns:2911, rev:16481.25, price:5.66},
+    {r:8, name:"Sustainably Grown Organic Rg", txns:2842, rev:16233.75, price:5.71},
+    {r:9, name:"Cappuccino",                   txns:2793, rev:15997.50, price:5.73},
+    {r:10,name:"Brazilian Lg",                 txns:2771, rev:15109.50, price:5.45},
+    {r:11,name:"Ethiopia Lg",                  txns:2741, rev:14794.50, price:5.40},
+    {r:12,name:"Dark Chocolate Rg",            txns:2636, rev:14024.50, price:5.32},
+    {r:13,name:"Spicy Eye Opener Chai Lg",     txns:2951, rev:13652.40, price:4.63},
+    {r:14,name:"Ethiopia Rg",                  txns:2866, rev:13179.00, price:4.60},
+    {r:15,name:"Brazilian Rg",                 txns:2904, rev:13155.00, price:4.53},
+    {r:16,name:"Peppermint Lg",                txns:2857, rev:13050.00, price:4.57},
+    {r:17,name:"English Breakfast Lg",         txns:2852, rev:12927.00, price:4.53},
+    {r:18,name:"Earl Grey Lg",                 txns:2702, rev:12735.00, price:4.71},
+    {r:19,name:"Serenity Green Tea Lg",        txns:2750, rev:12660.00, price:4.60},
+    {r:20,name:"Columbian Medium Roast Lg",    txns:2731, rev:12585.00, price:4.61},
+  ],
+  hourly: [
+    {h:6,  slot:"6 AM", txns:4594,  rev:21900.27},
+    {h:7,  slot:"7 AM", txns:13428, rev:63526.47},
+    {h:8,  slot:"8 AM", txns:17654, rev:82699.87},
+    {h:9,  slot:"9 AM", txns:17764, rev:85169.53},
+    {h:10, slot:"10 AM",txns:18545, rev:88673.39},
+    {h:11, slot:"11 AM",txns:9766,  rev:46319.14},
+    {h:12, slot:"12 PM",txns:8708,  rev:40192.79},
+    {h:13, slot:"1 PM", txns:8714,  rev:40367.45},
+    {h:14, slot:"2 PM", txns:8933,  rev:41304.74},
+    {h:15, slot:"3 PM", txns:8979,  rev:41733.10},
+    {h:16, slot:"4 PM", txns:9093,  rev:41122.75},
+    {h:17, slot:"5 PM", txns:8745,  rev:40134.31},
+    {h:18, slot:"6 PM", txns:7498,  rev:34286.20},
+    {h:19, slot:"7 PM", txns:6092,  rev:28446.68},
+    {h:20, slot:"8 PM", txns:603,   rev:2935.64},
+  ],
+  weekday: [
+    {day:"Monday",   txns:21643,rev:101677.28,avg:4.70},
+    {day:"Tuesday",  txns:21202,rev:99455.94, avg:4.69},
+    {day:"Wednesday",txns:21310,rev:100313.54,avg:4.71},
+    {day:"Thursday", txns:21654,rev:100767.78,avg:4.65},
+    {day:"Friday",   txns:21701,rev:101373.00,avg:4.67},
+    {day:"Saturday", txns:20510,rev:96894.48, avg:4.72},
+    {day:"Sunday",   txns:21096,rev:98330.31, avg:4.66},
+  ],
+  store_monthly: [
+    {m:"Jan",a:27313.66,h:27820.65,l:26543.43},
+    {m:"Feb",a:25105.34,h:25719.80,l:25320.05},
+    {m:"Mar",a:32835.43,h:33110.57,l:32888.68},
+    {m:"Apr",a:39477.61,h:40304.14,l:39159.33},
+    {m:"May",a:52428.76,h:52598.93,l:51700.07},
+    {m:"Jun",a:55083.11,h:56957.08,l:54445.69},
+  ],
+};
+
+// helpers
+const $ = id => document.getElementById(id);
+const f$ = (n,d=0) => '$'+n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fN = n => n.toLocaleString('en-US');
+const mom = v => v == null ? '—' : `<span class="${v>=0?'up':'dn'}">${v>=0?'↑':'↓'}${Math.abs(v).toFixed(1)}%</span>`;
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  $('tab-'+name).classList.add('active');
+}
+
+// chart defaults
+Chart.defaults.color = '#7a6040';
+Chart.defaults.borderColor = '#2e2416';
+Chart.defaults.font.family = 'Segoe UI, sans-serif';
+Chart.defaults.font.size = 10;
+const G = '#c9912a', GL = '#e8b84a';
+const tt = { backgroundColor:'#231a0d', borderColor:G, borderWidth:1 };
+const CAT_COLORS = ['#c9912a','#8b5519','#5c3a16','#3d2512','#29190b','#4a6030','#3a5025','#2a3d1a','#1a2a10'];
+
+// DASHBOARD charts
+new Chart($('monthlyChart'), {
+  data: {
+    labels: D.monthly.map(d=>d.m),
+    datasets: [
+      { type:'bar', data:D.monthly.map(d=>d.rev),
+        backgroundColor:['#5c3a16','#5c3a16','#8b5519','#c9912a','#e0a835','#e8b84a'],
+        borderRadius:2, borderWidth:0, yAxisID:'y' },
+      { type:'line', data:D.monthly.map(d=>d.mom),
+        borderColor:GL, borderWidth:1.5, pointRadius:3, pointBackgroundColor:GL,
+        tension:0.4, fill:false, borderDash:[4,4], yAxisID:'y2' }
+    ]
+  },
+  options:{ responsive:true, plugins:{legend:{display:false},tooltip:tt},
+    scales:{ y:{grid:{color:'rgba(46,36,22,.8)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'K'}},
+             y2:{position:'right',grid:{display:false},ticks:{callback:v=>v+'%'}} } }
+});
+
+new Chart($('storePie'), {
+  type:'doughnut',
+  data:{ labels:D.stores.map(d=>d.name),
+    datasets:[{data:D.stores.map(d=>d.rev), backgroundColor:['#c9912a','#8b5519','#3d2512'],
+               borderColor:'#231a0d', borderWidth:3}] },
+  options:{ cutout:'60%', plugins:{legend:{position:'bottom',labels:{boxWidth:8,padding:10}},tooltip:tt} }
+});
+
+const maxRev = D.stores[0].rev;
+D.stores.forEach(s=>{
+  $('storeBars').innerHTML += `<div>
+    <div class="sbar-label"><span>${s.name}</span><span>${f$(s.rev)}</span></div>
+    <div class="sbar-track"><div class="sbar-fill" style="width:${(s.rev/maxRev*100).toFixed(0)}%"></div></div>
+  </div>`;
+});
+
+new Chart($('catDoughnut'), {
+  type:'doughnut',
+  data:{ labels:D.categories.map(d=>d.name),
+    datasets:[{data:D.categories.map(d=>d.rev), backgroundColor:CAT_COLORS,
+               borderColor:'#231a0d', borderWidth:3}] },
+  options:{ cutout:'50%', plugins:{legend:{position:'right',labels:{boxWidth:8,padding:6,font:{size:9}}},tooltip:tt} }
+});
+
+// monthly table
+let mHtml = `<thead><tr><th>Month</th><th>Txns</th><th>Revenue</th><th>Avg</th><th>MoM</th></tr></thead><tbody>`;
+D.monthly.forEach(d => {
+  mHtml += `<tr><td><b>${d.m}</b></td><td>${fN(d.txns)}</td><td>${f$(d.rev)}</td><td>${f$(d.avg,2)}</td><td>${mom(d.mom)}</td></tr>`;
+});
+mHtml += `<tr class="total-row"><td><b>Total</b></td><td>${fN(149116)}</td><td>${f$(698812.33)}</td><td>${f$(4.69,2)}</td><td>—</td></tr></tbody>`;
+$('monthlyTbl').innerHTML = mHtml;
+
+new Chart($('weekdayMini'), {
+  type:'bar',
+  data:{ labels:D.weekday.map(d=>d.day.slice(0,3)),
+    datasets:[{data:D.weekday.map(d=>d.rev), backgroundColor:G, borderRadius:2, borderWidth:0}] },
+  options:{ responsive:true, plugins:{legend:{display:false},tooltip:tt},
+    scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(46,36,22,.8)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'K'}} } }
+});
+
+// PRODUCTS tab
+new Chart($('catBar'), {
+  type:'bar',
+  data:{ labels:D.categories.map(d=>d.name),
+    datasets:[{data:D.categories.map(d=>d.rev), backgroundColor:CAT_COLORS, borderRadius:2, borderWidth:0}] },
+  options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false},tooltip:tt},
+    scales:{ x:{grid:{color:'rgba(46,36,22,.6)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'K'}}, y:{grid:{display:false}} } }
+});
+
+const totalRev = D.categories.reduce((a,d)=>a+d.rev,0);
+let cHtml = `<thead><tr><th>Category</th><th>Txns</th><th>Revenue</th><th>Share</th></tr></thead><tbody>`;
+D.categories.forEach(d=>{
+  cHtml += `<tr><td>${d.name}</td><td>${fN(d.txns)}</td><td>${f$(d.rev)}</td><td>${(d.rev/totalRev*100).toFixed(1)}%</td></tr>`;
+});
+cHtml += `<tr class="total-row"><td><b>Total</b></td><td>${fN(149116)}</td><td>${f$(698812.33)}</td><td>100%</td></tr></tbody>`;
+$('catTbl').innerHTML = cHtml;
+
+const totalProd = D.products.reduce((a,d)=>a+d.rev,0);
+let pHtml = `<thead><tr><th>#</th><th>Product</th><th>Txns</th><th>Revenue</th><th>Share</th><th>Avg Price</th></tr></thead><tbody>`;
+D.products.forEach(d=>{
+  const cls = d.r<=3 ? 'gold' : '';
+  pHtml += `<tr><td><span class="rank-n ${cls}">${d.r}</span></td><td>${d.name}</td><td>${fN(d.txns)}</td><td>${f$(d.rev)}</td><td>${(d.rev/totalProd*100).toFixed(1)}%</td><td>${f$(d.price,2)}</td></tr>`;
+});
+$('prodTbl').innerHTML = pHtml + '</tbody>';
+
+// TIME tab
+new Chart($('hourlyChart'), {
+  type:'bar',
+  data:{ labels:D.hourly.map(d=>d.slot),
+    datasets:[{ data:D.hourly.map(d=>d.rev),
+      backgroundColor: D.hourly.map(d=> d.h>=8&&d.h<=10?'#e8b84a': d.rev>=50000?'#c9912a':'#5c3a16'),
+      borderRadius:2, borderWidth:0 }] },
+  options:{ responsive:true, plugins:{legend:{display:false},tooltip:tt},
+    scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(46,36,22,.8)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'K'}} } }
+});
+
+const totalHrev = D.hourly.reduce((a,d)=>a+d.rev,0);
+let hHtml = `<thead><tr><th>Time</th><th>Txns</th><th>Revenue</th><th>Share</th></tr></thead><tbody>`;
+D.hourly.forEach(d=>{
+  const peak = d.h>=8&&d.h<=10;
+  hHtml += `<tr class="${peak?'peak-row':''}"><td>${d.slot}${peak?' ⭐':''}</td><td>${fN(d.txns)}</td><td>${f$(d.rev)}</td><td>${(d.rev/totalHrev*100).toFixed(1)}%</td></tr>`;
+});
+$('hourlyTbl').innerHTML = hHtml + '</tbody>';
+
+new Chart($('weekdayBar'), {
+  type:'bar',
+  data:{ labels:D.weekday.map(d=>d.day.slice(0,3)),
+    datasets:[{data:D.weekday.map(d=>d.rev), backgroundColor:G, borderRadius:2, borderWidth:0}] },
+  options:{ responsive:true, plugins:{legend:{display:false},tooltip:tt},
+    scales:{ x:{grid:{display:false}}, y:{min:90000, grid:{color:'rgba(46,36,22,.8)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'K'}} } }
+});
+
+const totalWrev = D.weekday.reduce((a,d)=>a+d.rev,0);
+let wHtml = `<thead><tr><th>Day</th><th>Txns</th><th>Revenue</th><th>Share</th><th>Avg Order</th></tr></thead><tbody>`;
+D.weekday.forEach(d=>{
+  wHtml += `<tr><td>${d.day}</td><td>${fN(d.txns)}</td><td>${f$(d.rev)}</td><td>${(d.rev/totalWrev*100).toFixed(1)}%</td><td>${f$(d.avg,2)}</td></tr>`;
+});
+wHtml += `<tr class="total-row"><td><b>Total</b></td><td>${fN(149116)}</td><td>${f$(698812.33)}</td><td>100%</td><td>${f$(4.69,2)}</td></tr>`;
+$('weekdayTbl').innerHTML = wHtml + '</tbody>';
+
+// heatmap
+const wdLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const wdFactors = [1.02,1.00,1.01,1.01,1.02,0.97,0.99];
+const hmVals = wdLabels.map((_,di)=> D.hourly.map(h=> Math.round(h.rev/7*wdFactors[di])));
+const hmMax = Math.max(...hmVals.flat());
+const cols = D.hourly.length;
+const hm = $('heatmap');
+hm.style.gridTemplateColumns = `48px repeat(${cols}, 1fr)`;
+hm.innerHTML = '<div></div>' + D.hourly.map(d=>`<div class="hm-lbl" style="justify-content:center">${d.slot}</div>`).join('');
+wdLabels.forEach((day,di)=>{
+  hm.innerHTML += `<div class="hm-lbl">${day}</div>`;
+  hmVals[di].forEach((val,hi)=>{
+    const t = val/hmMax;
+    const r = Math.round(61+t*171), g = Math.round(43+t*142), b = Math.round(31+t*43);
+    hm.innerHTML += `<div class="hm-cell" style="background:rgba(${r},${g},${b},${0.15+t*0.85})" data-tip="${day} ${D.hourly[hi].slot}: ${f$(val)}"></div>`;
+  });
+});
+
+// STORES tab
+new Chart($('storeGrouped'), {
+  type:'bar',
+  data:{ labels:D.store_monthly.map(d=>d.m),
+    datasets:[
+      {label:"Astoria",         data:D.store_monthly.map(d=>d.a), backgroundColor:'#c9912a', borderRadius:2, borderWidth:0},
+      {label:"Hell's Kitchen",  data:D.store_monthly.map(d=>d.h), backgroundColor:'#e8b84a', borderRadius:2, borderWidth:0},
+      {label:"Lower Manhattan", data:D.store_monthly.map(d=>d.l), backgroundColor:'#5c3a16', borderRadius:2, borderWidth:0},
+    ]
+  },
+  options:{ responsive:true, plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12}},tooltip:tt},
+    scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(46,36,22,.8)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'K'}} } }
+});
+
+let smHtml = `<thead><tr><th>Month</th><th>Astoria</th><th>Hell's K</th><th>L.Manhat.</th><th>Total</th></tr></thead><tbody>`;
+D.store_monthly.forEach((d,i)=>{
+  const tot = d.a+d.h+d.l;
+  const prev = i>0 ? D.store_monthly[i-1] : null;
+  const prevTot = prev ? prev.a+prev.h+prev.l : null;
+  const totMom = prevTot ? mom(((tot-prevTot)/prevTot*100)) : '—';
+  smHtml += `<tr><td><b>${d.m}</b></td><td>${f$(d.a)}</td><td>${f$(d.h)}</td><td>${f$(d.l)}</td><td>${f$(tot)} ${totMom}</td></tr>`;
+});
+smHtml += `<tr class="total-row"><td><b>Total</b></td><td>${f$(232243.91)}</td><td>${f$(236511.17)}</td><td>${f$(230057.25)}</td><td>${f$(698812.33)}</td></tr>`;
+$('storeMthTbl').innerHTML = smHtml + '</tbody>';
+
+const bases = {a:D.store_monthly[0].a, h:D.store_monthly[0].h, l:D.store_monthly[0].l};
+new Chart($('storeIndex'), {
+  type:'line',
+  data:{ labels:D.store_monthly.map(d=>d.m),
+    datasets:[
+      {label:"Astoria",         data:D.store_monthly.map(d=>+(d.a/bases.a*100).toFixed(1)), borderColor:'#c9912a', borderWidth:2, pointRadius:3, tension:0.4, fill:false},
+      {label:"Hell's Kitchen",  data:D.store_monthly.map(d=>+(d.h/bases.h*100).toFixed(1)), borderColor:'#e8b84a', borderWidth:2, pointRadius:3, tension:0.4, fill:false},
+      {label:"Lower Manhattan", data:D.store_monthly.map(d=>+(d.l/bases.l*100).toFixed(1)), borderColor:'#8b5519', borderWidth:2, pointRadius:3, tension:0.4, fill:false},
+    ]
+  },
+  options:{ responsive:true, plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12}},tooltip:tt},
+    scales:{ x:{grid:{display:false}}, y:{grid:{color:'rgba(46,36,22,.8)'}} } }
+});
+
+// RAW sample
+const sample = [
+  ["1","2023-01-01","07:06","2","5","Lower Manhattan","32","3.00","Coffee","Gourmet brewed coffee","Ethiopia Rg","6.00"],
+  ["2","2023-01-01","07:08","2","5","Lower Manhattan","57","3.10","Tea","Brewed Chai tea","Spicy Eye Opener Chai Lg","6.20"],
+  ["3","2023-01-01","07:14","2","5","Lower Manhattan","59","4.50","Drinking Chocolate","Hot chocolate","Dark chocolate Lg","9.00"],
+  ["4","2023-01-01","07:20","1","5","Lower Manhattan","22","2.00","Coffee","Drip coffee","Our Old Time Diner Blend Sm","2.00"],
+  ["5","2023-01-01","07:22","2","5","Lower Manhattan","57","3.10","Tea","Brewed Chai tea","Spicy Eye Opener Chai Lg","6.20"],
+  ["6","2023-01-01","07:22","1","5","Lower Manhattan","77","3.00","Bakery","Scone","Oatmeal Scone","3.00"],
+  ["7","2023-01-01","07:26","1","5","Lower Manhattan","22","2.00","Coffee","Drip coffee","Our Old Time Diner Blend Sm","2.00"],
+  ["8","2023-01-01","07:33","2","5","Lower Manhattan","28","2.00","Coffee","Gourmet brewed coffee","Columbian Medium Roast Sm","4.00"],
+  ["9","2023-01-01","07:39","1","5","Lower Manhattan","39","4.25","Coffee","Barista Espresso","Latte Rg","4.25"],
+  ["10","2023-01-01","07:40","2","5","Lower Manhattan","58","3.50","Drinking Choc","Hot chocolate","Dark chocolate Rg","7.00"],
+];
+const hdrs = ["ID","Date","Time","Qty","Store ID","Location","Prod ID","Unit $","Category","Type","Product","Revenue"];
+let rHtml = `<thead><tr>${hdrs.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+for(let i=0;i<50;i++){
+  const row = sample[i%sample.length].map((v,j)=>j===0?String(i+1):v);
+  rHtml += `<tr>${row.map(v=>`<td>${v}</td>`).join('')}</tr>`;
+}
+$('rawTbl').innerHTML = rHtml + '</tbody>';
+</script>
+</body>
+</html>
